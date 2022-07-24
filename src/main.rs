@@ -23,29 +23,37 @@ impl Node for DNode {
 struct QNode {
     next_node: u32,
     text: String,
-    options: HashMap<String, u32>,
+    options: Vec<String>,  // Holds ordered list of options
+    options_indices: HashMap<String, u32>,  // Holds unordered mapping of option to node id
 }
 impl Node for QNode {
     fn print(&mut self) -> u32 {
         println!("{}", self.text);
-        for (key, _) in &self.options {
+        for key in &self.options {
             println!("[ {} ]", key);
         }
-        let mut user_input = "".to_string();
+        let mut user_input = String::new();
+        let mut waiting_for_answer: bool = true;
 
-        // NOTE: Find way to order options? HashMap is unordered data struct
-
-        while !self.options.contains_key(&user_input) {
+        while waiting_for_answer {
             io::stdin().read_line(&mut user_input).expect("Failed to read line.");
+            if self.options.contains(&user_input.trim().to_string()) {
+                // In the line above, if you don't call trim() to remove newline char, comparison doesn't work
+                waiting_for_answer = false;
+            } else {
+                println!("Invalid selection! You wrote: {}", user_input);
+                user_input.clear();  // String must be cleared before read into again with I/O
+            }
         }
-        let selected: Option<&u32> = self.options.get(&user_input);
-        match selected {
-            Some(x) => {
-                self.next_node = *x;
+        // let matching_index: usize = self.options.iter().position(|x| *x==user_input).unwrap();
+        let next_node_option = self.options_indices.get(&user_input.trim().to_string());
+        match next_node_option {
+            Some(node) => {
+                self.next_node = *node;
             }
             None => {
-                // Shouldn't occur, print this as a warning instead
-                println!("WARNING: Non-existent QNode option selected?");
+                // ERROR CASE
+                println!("ERROR: User input in Vector but not in HashMap!")
             }
         }
         self.next_node
@@ -55,9 +63,11 @@ impl Node for QNode {
     }
 }
 impl QNode {
-    fn insert_option(&mut self, key: String, value: u32) {
-        // NOTE: Can override previously-existing values.
-        self.options.insert(key, value);
+    fn insert_option(&mut self, option: String, correlated_node_id: u32) {
+        // NOTE: Is ordered.
+        let option_again: String = option.clone();
+        self.options.push(option);
+        self.options_indices.insert(option_again, correlated_node_id);
     }
 }
 
@@ -126,7 +136,8 @@ fn main() {
     let mut node_4 = QNode {
         next_node: 0,
         text: String::from("What is your favourite flavour of ice cream?"),
-        options: HashMap::new(),
+        options: Vec::new(),
+        options_indices: HashMap::new(),
     };
     node_4.insert_option("Vanilla".to_string(), 5);
     node_4.insert_option("Chocolate".to_string(), 6);
